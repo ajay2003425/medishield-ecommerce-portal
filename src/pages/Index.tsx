@@ -1,132 +1,89 @@
 
 import React, { useState, useEffect } from 'react';
-import { Search, ShoppingCart, User, Heart, Menu, X, Shield, Truck, Clock, Phone } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard';
 import CategorySection from '@/components/CategorySection';
 import HeroSection from '@/components/HeroSection';
 import Navigation from '@/components/Navigation';
 import AuthModal from '@/components/AuthModal';
 import CartSidebar from '@/components/CartSidebar';
-
-// Sample data - in a real app, this would come from your backend
-const featuredProducts = [
-  {
-    id: 1,
-    name: "Paracetamol 500mg",
-    brand: "Crocin",
-    price: 45,
-    originalPrice: 50,
-    image: "/placeholder.svg",
-    category: "Pain Relief",
-    prescriptionRequired: false,
-    rating: 4.5,
-    reviews: 1250,
-    inStock: true
-  },
-  {
-    id: 2,
-    name: "Azithromycin 500mg",
-    brand: "Zithromax",
-    price: 180,
-    originalPrice: 200,
-    image: "/placeholder.svg",
-    category: "Antibiotics",
-    prescriptionRequired: true,
-    rating: 4.3,
-    reviews: 890,
-    inStock: true
-  },
-  {
-    id: 3,
-    name: "Vitamin D3 Tablets",
-    brand: "HealthKart",
-    price: 320,
-    originalPrice: 350,
-    image: "/placeholder.svg",
-    category: "Vitamins",
-    prescriptionRequired: false,
-    rating: 4.6,
-    reviews: 2100,
-    inStock: true
-  },
-  {
-    id: 4,
-    name: "Omeprazole 20mg",
-    brand: "Omez",
-    price: 95,
-    originalPrice: 110,
-    image: "/placeholder.svg",
-    category: "Gastro",
-    prescriptionRequired: true,
-    rating: 4.4,
-    reviews: 750,
-    inStock: false
-  }
-];
-
-const categories = [
-  { name: "Pain Relief", icon: "💊", count: 150 },
-  { name: "Vitamins", icon: "🌟", count: 89 },
-  { name: "Heart Care", icon: "❤️", count: 67 },
-  { name: "Diabetes", icon: "🩺", count: 45 },
-  { name: "Skin Care", icon: "✨", count: 120 },
-  { name: "Baby Care", icon: "👶", count: 78 }
-];
+import { useAuth } from '@/hooks/useAuth';
+import { useProducts, useCategories } from '@/hooks/useProducts';
+import { useCart } from '@/hooks/useCart';
+import { useNavigate } from 'react-router-dom';
+import { Shield, Truck, Phone } from 'lucide-react';
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [cartItems, setCartItems] = useState([]);
-  const [user, setUser] = useState(null);
+  
+  const { user, signOut } = useAuth();
+  const { data: products = [], isLoading: productsLoading } = useProducts();
+  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
+  const { cartCount, addToCart } = useCart();
+  const navigate = useNavigate();
 
-  const addToCart = (product) => {
-    setCartItems(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => 
-          item.id === product.id 
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prev, { ...product, quantity: 1 }];
-    });
+  // Filter products based on search query
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    product.brand?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    product.categories?.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Convert database categories to the format expected by CategorySection
+  const categoryData = categories.map(cat => ({
+    name: cat.name,
+    icon: cat.icon || '💊',
+    count: products.filter(p => p.category_id === cat.id).length
+  }));
+
+  // Convert database products to the format expected by ProductCard
+  const productData = filteredProducts.slice(0, 8).map(product => ({
+    id: product.id,
+    name: product.name,
+    brand: product.brand || 'Generic',
+    price: Number(product.price),
+    originalPrice: Number(product.price) * 1.1, // 10% markup as original price
+    image: product.image_url || "/placeholder.svg",
+    category: product.categories?.name || 'Medicine',
+    prescriptionRequired: product.requires_prescription || false,
+    rating: 4.5, // Default rating
+    reviews: Math.floor(Math.random() * 2000) + 100, // Random reviews
+    inStock: (product.stock || 0) > 0
+  }));
+
+  const handleAuthClick = () => {
+    if (user) {
+      signOut();
+    } else {
+      navigate('/auth');
+    }
   };
 
-  const removeFromCart = (productId) => {
-    setCartItems(prev => prev.filter(item => item.id !== productId));
-  };
-
-  const updateQuantity = (productId, quantity) => {
-    if (quantity === 0) {
-      removeFromCart(productId);
+  const handleAddToCart = (product: any) => {
+    if (!user) {
+      navigate('/auth');
       return;
     }
-    setCartItems(prev => 
-      prev.map(item => 
-        item.id === productId 
-          ? { ...item, quantity }
-          : item
-      )
-    );
+    
+    // Find the original product from our filtered products
+    const originalProduct = filteredProducts.find(p => p.id === product.id);
+    if (originalProduct) {
+      addToCart({ productId: originalProduct.id });
+    }
   };
-
-  const cartTotal = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
-  const cartCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navigation 
         user={user}
         cartCount={cartCount}
-        onAuthClick={() => setIsAuthModalOpen(true)}
+        onAuthClick={handleAuthClick}
         onCartClick={() => setIsCartOpen(true)}
-        onLogout={() => setUser(null)}
+        onLogout={() => signOut()}
       />
 
       <main>
@@ -148,27 +105,43 @@ const Index = () => {
           </div>
         </section>
 
-        <CategorySection categories={categories} />
+        {!categoriesLoading && <CategorySection categories={categoryData} />}
 
         {/* Featured Products */}
         <section className="py-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="text-3xl font-bold text-gray-900">Popular Medicines</h2>
+              <h2 className="text-3xl font-bold text-gray-900">
+                {searchQuery ? 'Search Results' : 'Popular Medicines'}
+              </h2>
               <Button variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50">
                 View All
               </Button>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {featuredProducts.map((product) => (
-                <ProductCard 
-                  key={product.id} 
-                  product={product} 
-                  onAddToCart={() => addToCart(product)}
-                />
-              ))}
-            </div>
+            {productsLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="animate-pulse bg-gray-200 h-64 rounded-lg"></div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {productData.map((product) => (
+                  <ProductCard 
+                    key={product.id} 
+                    product={product} 
+                    onAddToCart={() => handleAddToCart(product)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {!productsLoading && filteredProducts.length === 0 && searchQuery && (
+              <div className="text-center py-12">
+                <p className="text-gray-500">No products found for "{searchQuery}"</p>
+              </div>
+            )}
           </div>
         </section>
 
@@ -205,16 +178,16 @@ const Index = () => {
       <AuthModal 
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
-        onLogin={setUser}
+        onLogin={() => {}}
       />
 
       <CartSidebar
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
-        items={cartItems}
-        onUpdateQuantity={updateQuantity}
-        onRemoveItem={removeFromCart}
-        total={cartTotal}
+        items={[]}
+        onUpdateQuantity={() => {}}
+        onRemoveItem={() => {}}
+        total={0}
       />
     </div>
   );
