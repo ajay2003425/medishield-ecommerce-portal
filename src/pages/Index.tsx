@@ -14,6 +14,7 @@ import { useProducts, useCategories } from '@/hooks/useProducts';
 import { useCart } from '@/hooks/useCart';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Truck, Phone } from 'lucide-react';
+import { ProductCardData } from '@/types';
 
 const Index = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,7 +42,7 @@ const Index = () => {
   }));
 
   // Convert database products to the format expected by ProductCard
-  const productData = filteredProducts.slice(0, 8).map(product => ({
+  const productData: ProductCardData[] = filteredProducts.slice(0, 8).map(product => ({
     id: product.id,
     name: product.name,
     brand: product.brand || 'Generic',
@@ -63,7 +64,7 @@ const Index = () => {
     }
   };
 
-  const handleAddToCart = (product: any) => {
+  const handleAddToCart = (product: ProductCardData) => {
     if (!user) {
       navigate('/auth');
       return;
