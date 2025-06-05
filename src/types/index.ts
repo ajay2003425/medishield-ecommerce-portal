@@ -4,7 +4,7 @@ export interface ProductCardData {
   name: string;
   brand: string;
   price: number;
-  originalPrice: number;
+  originalPrice?: number;
   image: string;
   category: string;
   prescriptionRequired: boolean;
@@ -12,3 +12,6 @@ export interface ProductCardData {
   reviews: number;
   inStock: boolean;
 }
+
+// Alias for consistency - both refer to the same product structure
+export type Product = ProductCardData;

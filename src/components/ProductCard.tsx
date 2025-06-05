@@ -1,23 +1,9 @@
-
 import React, { useState } from 'react';
 import { Heart, ShoppingCart, Star, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
-
-interface Product {
-  id: string;
-  name: string;
-  brand: string;
-  price: number;
-  originalPrice?: number;
-  image: string;
-  category: string;
-  prescriptionRequired: boolean;
-  rating: number;
-  reviews: number;
-  inStock: boolean;
-}
+import { Product } from '@/types';
 
 interface ProductCardProps {
   product: Product;
