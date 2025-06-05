@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -16,6 +19,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }: AuthModalProps) => {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -23,34 +27,64 @@ const AuthModal = ({ isOpen, onClose, onLogin }: AuthModalProps) => {
     confirmPassword: ''
   });
 
+  const { signIn, signUp } = useAuth();
+  const { toast } = useToast();
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (isLoginMode) {
-      // Simulate login
-      onLogin({
-        name: 'John Doe',
-        email: formData.email,
-        id: '1'
-      });
-    } else {
-      // Simulate registration
-      onLogin({
-        name: formData.name,
-        email: formData.email,
-        id: '1'
-      });
+    setError(null);
+
+    if (!isLoginMode && formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      setIsLoading(false);
+      return;
     }
-    
-    setIsLoading(false);
-    onClose();
-    setFormData({ name: '', email: '', password: '', confirmPassword: '' });
+
+    try {
+      if (isLoginMode) {
+        const { error } = await signIn(formData.email, formData.password);
+        if (error) {
+          if (error.message.includes('Email not confirmed')) {
+            setError('Please check your email and click the confirmation link before signing in.');
+          } else if (error.message.includes('Invalid login credentials')) {
+            setError('Invalid email or password. Please check your credentials.');
+          } else {
+            setError(error.message);
+          }
+        } else {
+          toast({
+            title: "Welcome back!",
+            description: "You have successfully signed in.",
+          });
+          onClose();
+        }
+      } else {
+        const { error } = await signUp(formData.email, formData.password, formData.name);
+        if (error) {
+          if (error.message.includes('rate limit')) {
+            setError('Too many signup attempts. Please wait a moment before trying again.');
+          } else if (error.message.includes('User already registered')) {
+            setError('An account with this email already exists. Try signing in instead.');
+          } else {
+            setError(error.message);
+          }
+        } else {
+          toast({
+            title: "Account created!",
+            description: "Please check your email to verify your account before signing in.",
+          });
+          setIsLoginMode(true);
+          setFormData({ name: '', email: '', password: '', confirmPassword: '' });
+        }
+      }
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,6 +92,12 @@ const AuthModal = ({ isOpen, onClose, onLogin }: AuthModalProps) => {
       ...prev,
       [e.target.name]: e.target.value
     }));
+  };
+
+  const toggleMode = () => {
+    setIsLoginMode(!isLoginMode);
+    setError(null);
+    setFormData({ name: '', email: '', password: '', confirmPassword: '' });
   };
 
   return (
@@ -134,6 +174,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }: AuthModalProps) => {
                   onChange={handleInputChange}
                   className="pl-10 pr-10"
                   placeholder="Enter your password"
+                  minLength={6}
                 />
                 <Button
                   type="button"
@@ -170,7 +211,17 @@ const AuthModal = ({ isOpen, onClose, onLogin }: AuthModalProps) => {
               </div>
             )}
 
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button 
+              type="submit" 
+              className="w-full bg-blue-600 hover:bg-blue-700" 
+              disabled={isLoading}
+            >
               {isLoading ? (
                 "Processing..."
               ) : (
@@ -184,7 +235,7 @@ const AuthModal = ({ isOpen, onClose, onLogin }: AuthModalProps) => {
               {isLoginMode ? "Don't have an account? " : "Already have an account? "}
               <button
                 type="button"
-                onClick={() => setIsLoginMode(!isLoginMode)}
+                onClick={toggleMode}
                 className="text-blue-600 hover:text-blue-700 font-medium"
               >
                 {isLoginMode ? "Sign up" : "Sign in"}
@@ -197,6 +248,12 @@ const AuthModal = ({ isOpen, onClose, onLogin }: AuthModalProps) => {
               <button
                 type="button"
                 className="text-sm text-blue-600 hover:text-blue-700"
+                onClick={() => {
+                  toast({
+                    title: "Password Reset",
+                    description: "Please contact support for password reset assistance.",
+                  });
+                }}
               >
                 Forgot your password?
               </button>

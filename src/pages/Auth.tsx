@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const Auth = () => {
@@ -14,6 +14,7 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -36,7 +37,15 @@ const Auth = () => {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) {
-          setError(error.message);
+          if (error.message.includes('Email not confirmed')) {
+            setError('Please check your email and click the confirmation link before signing in. If you didn\'t receive the email, try signing up again.');
+          } else if (error.message.includes('Invalid login credentials')) {
+            setError('Invalid email or password. Please check your credentials and try again.');
+          } else if (error.message.includes('rate limit')) {
+            setError('Too many login attempts. Please wait a moment before trying again.');
+          } else {
+            setError(error.message);
+          }
         } else {
           toast({
             title: "Welcome back!",
@@ -45,21 +54,47 @@ const Auth = () => {
           navigate('/');
         }
       } else {
+        if (password.length < 6) {
+          setError('Password must be at least 6 characters long.');
+          setLoading(false);
+          return;
+        }
+
         const { error } = await signUp(email, password, fullName);
         if (error) {
-          setError(error.message);
+          if (error.message.includes('rate limit') || error.message.includes('email_send_rate_limit')) {
+            setError('Too many signup attempts. Please wait a moment before trying again.');
+          } else if (error.message.includes('User already registered')) {
+            setError('An account with this email already exists. Try signing in instead.');
+            setIsLogin(true);
+          } else if (error.message.includes('Invalid email')) {
+            setError('Please enter a valid email address.');
+          } else {
+            setError(error.message);
+          }
         } else {
           toast({
             title: "Account created!",
-            description: "Please check your email to verify your account.",
+            description: "Please check your email to verify your account before signing in.",
           });
+          setIsLogin(true);
+          setPassword('');
+          setFullName('');
         }
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError('An unexpected error occurred. Please try again.');
+      console.error('Auth error:', err);
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleAuthMode = () => {
+    setIsLogin(!isLogin);
+    setError(null);
+    setPassword('');
+    setFullName('');
   };
 
   return (
@@ -136,15 +171,33 @@ const Auth = () => {
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 pr-10"
                     placeholder="Enter your password"
                     minLength={6}
                   />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-0 top-0 p-2"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5 text-gray-400" />
+                    ) : (
+                      <Eye className="h-5 w-5 text-gray-400" />
+                    )}
+                  </Button>
                 </div>
+                {!isLogin && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Password must be at least 6 characters long
+                  </p>
+                )}
               </div>
 
               {error && (
@@ -164,15 +217,36 @@ const Auth = () => {
               <div className="text-center">
                 <button
                   type="button"
-                  onClick={() => setIsLogin(!isLogin)}
+                  onClick={toggleAuthMode}
                   className="text-blue-600 hover:text-blue-800 text-sm"
                 >
                   {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
                 </button>
               </div>
+
+              {isLogin && (
+                <div className="text-center">
+                  <button
+                    type="button"
+                    className="text-sm text-blue-600 hover:text-blue-800"
+                    onClick={() => {
+                      toast({
+                        title: "Password Reset",
+                        description: "Please contact support for password reset assistance.",
+                      });
+                    }}
+                  >
+                    Forgot your password?
+                  </button>
+                </div>
+              )}
             </form>
           </CardContent>
         </Card>
+
+        <div className="text-center text-blue-200 text-sm">
+          <p>Note: You'll need to verify your email address after signing up</p>
+        </div>
       </div>
     </div>
   );
